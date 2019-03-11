@@ -1,3 +1,10 @@
+# VS
+Debug
+*.sln
+*.user
+*.vs
+
+
 # Prerequisites
 *.d
 
