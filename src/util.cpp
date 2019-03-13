@@ -26,15 +26,57 @@ double get_frame_rate(std::time_t &prev_time_ms)
 	return frame_rate;
 }
 
+void rs_frame_to_cv_rgb(rs2::video_frame & frame, cv::Mat &image_rgb)
+{
+	int w = frame.get_width();
+	int h = frame.get_height();
+	image_rgb = cv::Mat(cv::Size(w, h), CV_8UC3, (void*)frame.get_data(), cv::Mat::AUTO_STEP);
+}
+
 void visualize(rs2::video_frame &image, const char * const window_name, double frame_rate)
 {
-	int w = image.get_width();
-	int h = image.get_height();
-	cv::Mat image_rgb(cv::Size(w, h), CV_8UC3, (void*)image.get_data(), cv::Mat::AUTO_STEP);
+	cv::Mat image_rgb;
+	rs_frame_to_cv_rgb(image, image_rgb);
 	cv::Mat image_bgr;
 	cv::cvtColor(image_rgb, image_bgr, cv::COLOR_RGB2BGR);
 	std::stringstream text;
 	text << "FPS: " << frame_rate;
 	cv::putText(image_bgr, text.str(), cvPoint(30, 30), cv::FONT_HERSHEY_SIMPLEX, 0.8, cvScalar(255, 255, 255), 1, CV_AA);
 	cv::imshow(window_name, image_bgr);
+}
+void visualize(cv::Mat &image, const char * const window_name, double frame_rate)
+{
+	cv::Mat image_bgr;
+	cv::cvtColor(image, image_bgr, cv::COLOR_RGB2BGR);
+	std::stringstream text;
+	text << "FPS: " << frame_rate;
+	cv::putText(image_bgr, text.str(), cvPoint(30, 30), cv::FONT_HERSHEY_SIMPLEX, 0.8, cvScalar(255, 255, 255), 1, CV_AA);
+	cv::imshow(window_name, image_bgr);
+}
+
+void vis_bbox(cv::Mat & image_out, cv::Mat & image_in, cv::Mat & det_in)
+{
+	cv::Mat det_mat(det_in.size[2], det_in.size[3], CV_32F, det_in.ptr<float>());
+	image_out = image_in.clone();
+
+	float SCORE_THR = static_cast<float>(0.2);
+	for (int i = 0; i < det_mat.rows; i++)
+	{
+		float score = det_mat.at<float>(i, 2);
+		if (score > SCORE_THR)
+		{
+			int idx = static_cast<int>(det_mat.at<float>(i, 1));
+			int x_min = static_cast<int>(det_mat.at<float>(i, 3) * image_in.cols);
+			int y_min = static_cast<int>(det_mat.at<float>(i, 4) * image_in.rows);
+			int x_max = static_cast<int>(det_mat.at<float>(i, 5) * image_in.cols);
+			int y_max = static_cast<int>(det_mat.at<float>(i, 6) * image_in.rows);
+			cv::Rect bbox(x_min, y_min, (x_max - x_min), (y_max - y_min));
+			cv::rectangle(image_out, bbox, cv::Scalar(0, 255, 0), 2);
+			std::ostringstream score_str;
+			score_str << score;
+			cv::String text = label_map[idx] + "(" + cv::String(score_str.str()) + ")";
+			cv::putText(image_out, text, cv::Point(x_min, y_min),
+				cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 255, 0));
+		}
+	}
 }

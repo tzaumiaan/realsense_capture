@@ -3,7 +3,7 @@ Debug
 *.sln
 *.user
 *.vs
-
+MobileNetSSD*
 
 # Prerequisites
 *.d

@@ -1,8 +1,4 @@
 #include "func.h"
-#include "util.h"
-#include "config.h"
-
-#include <thread>
 
 int demo_stream(void)
 try {
@@ -54,6 +50,9 @@ try {
 		const auto window_name = "Display Image";
 		cv::namedWindow(window_name, cv::WINDOW_AUTOSIZE);
 		std::time_t prev_time_ms = 0;
+		cv::Mat image_rgb;
+		obj_det_caffe model;
+		model.load_model("MobileNetSSD_deploy.prototxt", "MobileNetSSD_deploy.caffemodel");
 		while(cv::waitKey(1) < 0 && cvGetWindowHandle(window_name))
 		{
 			rs2::frame frame;
@@ -62,8 +61,10 @@ try {
 				auto image = rs2::video_frame(frame);
 				std::cout << "dequeue" << get_time_str() << std::endl;
 				// Do processing on the frame
+				rs_frame_to_cv_rgb(image, image_rgb);
+				cv::Mat output = model.inference(image_rgb);
 				double frame_rate = get_frame_rate(prev_time_ms);
-				visualize(image, window_name, frame_rate);
+				visualize(output, window_name, frame_rate);
 			}
 		}
 	});
@@ -85,4 +86,29 @@ catch (const std::exception& e)
 {
 	std::cerr << e.what() << std::endl;
 	return EXIT_FAILURE;
+}
+
+obj_det_caffe::obj_det_caffe(void)
+{
+	// do nothing
+}
+
+void obj_det_caffe::load_model(const char* graph_file, const char* weight_file)
+{
+	// read in the model
+	model = cv::dnn::readNetFromCaffe(cv::String(graph_file), cv::String(weight_file));
+	model.setPreferableBackend(0); // 2: OpenVINO, 3: OpenCV
+	model.setPreferableTarget(0); // 0: CPU
+}
+
+cv::Mat obj_det_caffe::inference(cv::Mat & frame)
+{
+	cv::Mat frame_resize;
+	cv::resize(frame, frame_resize, cv::Size(300, 300));
+	cv::Mat input_blob = cv::dnn::blobFromImage(frame_resize, 0.007843, cv::Size(300, 300), cv::Scalar(127.5, 127.5, 127.5), true, false);
+	model.setInput(input_blob, "data");
+	cv::Mat detection = model.forward("detection_out");
+	cv::Mat output;
+	vis_bbox(output, frame, detection);
+	return output;
 }
