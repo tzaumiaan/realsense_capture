@@ -4,6 +4,7 @@ Debug
 *.user
 *.vs
 MobileNetSSD*
+x64
 
 # Prerequisites
 *.d
